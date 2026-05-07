@@ -52,7 +52,8 @@ const localPath = await client.download({
 ```typescript
 const client = new SkillNetClient({
   apiKey: 'sk-...',           // Required for create/evaluate/analyze
-  baseUrl: 'https://...',     // Optional: custom API endpoint
+  skillnetUrl: 'http://api-skillnet.openkg.cn/v1',  // SkillNet API server
+  baseUrl: 'https://api.openai.com/v1',             // LLM API endpoint
   githubToken: 'ghp-...'      // Optional: for private repos
 });
 ```
@@ -152,11 +153,12 @@ for (const rel of relationships) {
 
 ## Environment Variables
 
-| Variable       | Required For              | Default                     |
-|---------------|---------------------------|-----------------------------|
-| `API_KEY`     | create · evaluate · analyze | —                           |
-| `BASE_URL`    | Custom LLM endpoint       | `http://api-skillnet.openkg.cn/v1` |
-| `GITHUB_TOKEN`| Private repos             | —                           |
+| Variable        | Required For              | Default                              |
+|----------------|---------------------------|--------------------------------------|
+| `API_KEY`      | create · evaluate · analyze | —                                    |
+| `SKILLNET_URL` | Custom SkillNet server    | `http://api-skillnet.openkg.cn/v1`   |
+| `BASE_URL`     | Custom LLM endpoint       | `https://api.openai.com/v1`          |
+| `GITHUB_TOKEN` | Private repos             | —                                    |
 
 ## License
 
