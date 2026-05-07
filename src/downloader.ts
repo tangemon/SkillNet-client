@@ -1,12 +1,26 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as http from 'http';
+import * as https from 'https';
+import { URL } from 'url';
+
+export interface ProxyConfig {
+  host: string;
+  port: number;
+  auth?: {
+    username: string;
+    password: string;
+  };
+  protocol?: string;
+}
 
 export interface DownloaderConfig {
   apiToken?: string;
   mirrorUrl?: string;
   timeout?: number;
   maxRetries?: number;
+  proxy?: ProxyConfig | false;
 }
 
 export interface FileInfo {
@@ -34,12 +48,14 @@ export class SkillDownloader {
   private mirrorUrl: string;
   private timeout: number;
   private maxRetries: number;
+  private proxy?: ProxyConfig | false;
   private client: AxiosInstance;
 
   constructor(config: DownloaderConfig = {}) {
     this.apiToken = config.apiToken;
     this.timeout = config.timeout || 15;
     this.maxRetries = config.maxRetries || 3;
+    this.proxy = config.proxy;
 
     if (config.mirrorUrl !== undefined) {
       this.mirrorUrl = config.mirrorUrl;
@@ -47,16 +63,66 @@ export class SkillDownloader {
       this.mirrorUrl = process.env.GITHUB_MIRROR || '';
     }
 
-    this.client = axios.create({
+    const clientConfig: any = {
       timeout: this.timeout * 1000,
       headers: {
         'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         ...(this.apiToken ? { 'Authorization': `token ${this.apiToken}` } : {})
       }
-    });
+    };
+
+    if (this.proxy !== false) {
+      const proxyConfig = this.proxy || this._getProxyFromEnv();
+      if (proxyConfig) {
+        console.log(`Proxy configured (HTTPS CONNECT): ${proxyConfig.host}:${proxyConfig.port}`);
+        if (this.mirrorUrl) {
+          console.log(`Note: Proxy takes priority over mirror. Mirror will be disabled.`);
+        }
+      }
+    } else {
+      console.log('Proxy explicitly disabled');
+    }
+
+    this.client = axios.create(clientConfig);
 
     if (this.mirrorUrl) {
       console.log(`Mirror fallback enabled: ${this.mirrorUrl}`);
+    }
+  }
+
+  private _getProxyFromEnv(): ProxyConfig | null {
+    const proxyUrl = process.env.HTTPS_PROXY || 
+                     process.env.HTTP_PROXY || 
+                     process.env.https_proxy || 
+                     process.env.http_proxy ||
+                     process.env.Https_Proxy ||
+                     process.env.Http_Proxy;
+    
+    if (!proxyUrl) {
+      return null;
+    }
+
+    try {
+      const url = new URL(proxyUrl);
+      const proxyConfig: ProxyConfig = {
+        host: url.hostname,
+        port: parseInt(url.port || (url.protocol === 'https:' ? '443' : '80'), 10),
+        protocol: url.protocol.replace(':', '')
+      };
+
+      if (url.username && url.password) {
+        proxyConfig.auth = {
+          username: decodeURIComponent(url.username),
+          password: decodeURIComponent(url.password)
+        };
+      }
+
+      console.log(`Detected proxy from environment: ${proxyConfig.protocol}://${proxyConfig.host}:${proxyConfig.port}`);
+      return proxyConfig;
+    } catch (error) {
+      console.warn(`Failed to parse proxy URL from environment: ${proxyUrl}`);
+      return null;
     }
   }
 
@@ -215,7 +281,7 @@ export class SkillDownloader {
       fs.mkdirSync(path.dirname(localFilePath), { recursive: true });
     }
 
-    const mirrorUrl = this._buildMirrorUrl(rawUrl);
+    const mirrorUrl = this._shouldUseMirror() ? this._buildMirrorUrl(rawUrl) : null;
     const downloadUrl = mirrorUrl || rawUrl;
 
     try {
@@ -245,6 +311,15 @@ export class SkillDownloader {
     return `${mirror}/${originalUrl}`;
   }
 
+  _shouldUseMirror(): boolean {
+    const hasProxy = this.proxy !== false && (this.proxy || this._getProxyFromEnv());
+    if (hasProxy) {
+      console.log('Proxy is configured, skipping mirror to avoid conflicts');
+      return false;
+    }
+    return true;
+  }
+
   private async _requestWithRetry(
     url: string,
     timeout?: number,
@@ -256,7 +331,7 @@ export class SkillDownloader {
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const response = await this.client.get(url, { timeout: requestTimeout * 1000 });
+        const response = await this._requestViaProxy(url, requestTimeout * 1000);
 
         if (response.status === 403) {
           const remaining = response.headers['x-ratelimit-remaining'];
@@ -282,7 +357,7 @@ export class SkillDownloader {
             console.error(`Request timed out after ${retries} attempts: ${url}`);
             return null;
           }
-        } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ECONNRESET' || error.code === 'socket hang up') {
           if (attempt < retries) {
             const delay = baseDelay * Math.pow(2, attempt - 1);
             console.warn(`Connection error (attempt ${attempt}/${retries}), retry in ${delay.toFixed(1)}s: ${url}`);
@@ -291,8 +366,43 @@ export class SkillDownloader {
             console.error(`Connection failed after ${retries} attempts: ${url}`);
             return null;
           }
+        } else if (error.code === 'ETIMEDOUT') {
+          if (attempt < retries) {
+            const delay = baseDelay * Math.pow(2, attempt - 1);
+            console.warn(`Connection timed out (attempt ${attempt}/${retries}), retry in ${delay.toFixed(1)}s: ${url}`);
+            await this._sleep(delay);
+          } else {
+            console.error(`Connection timed out after ${retries} attempts: ${url}`);
+            return null;
+          }
+        } else if (error.code === 'HPE_INVALID_CONSTANT' || error.message?.includes('Parse Error')) {
+          console.error(`Proxy/Mirror parse error detected: ${error.message}`);
+          console.error('This usually indicates the proxy is returning invalid HTTP responses.');
+          console.error('Possible causes:');
+          console.error('  1. Proxy server does not support HTTPS requests');
+          console.error('  2. Proxy address or port is incorrect');
+          console.error('  3. Proxy server is malfunctioning');
+          console.error('  4. Proxy requires special authentication or configuration');
+          console.error('');
+          console.error('Recommendations:');
+          console.error('  1. Try disabling proxy: githubProxy: false in config');
+          console.error('  2. Try using HTTPS_PROXY instead of HTTP_PROXY');
+          console.error('  3. Try using mirror URL without proxy');
+          console.error('  4. Set GITHUB_TOKEN for direct GitHub access');
+          console.error('  5. Check if your proxy supports HTTPS tunneling (CONNECT method)');
+          return null;
         } else {
-          console.error(`Request failed: ${error}`);
+          const errorMessage = error.message || error.toString();
+          const errorCode = error.code || 'unknown';
+          console.error(`Request failed: ${errorMessage} (code: ${errorCode})`);
+          console.error('Possible causes:');
+          console.error('  - GitHub API rate limit exceeded (60 requests/hour for unauthenticated)');
+          console.error('  - Network connectivity issues or proxy configuration');
+          console.error('  - GitHub is temporarily blocking your IP');
+          console.error('Suggestions:');
+          console.error('  - Set GITHUB_TOKEN environment variable for authenticated requests');
+          console.error('  - Configure mirror URL with GITHUB_MIRROR environment variable');
+          console.error('  - Wait and retry later if rate limited');
           return null;
         }
       }
@@ -301,8 +411,131 @@ export class SkillDownloader {
     return null;
   }
 
+  /**
+   * 使用 CONNECT 隧道发送请求（模仿 Python requests 的实现）
+   */
+  private _requestViaProxy(url: string, timeout: number): Promise<AxiosResponse> {
+    return new Promise((resolve, reject) => {
+      const target = new URL(url);
+      const isHttps = target.protocol === 'https:';
+      const proxyConfig = this.proxy !== false ? (this.proxy || this._getProxyFromEnv()) : null;
+
+      // 如果没有配置代理，直接使用 axios
+      if (!proxyConfig) {
+        this.client.get(url, { timeout }).then(resolve).catch(reject);
+        return;
+      }
+
+      const proxyUrl = `http://${proxyConfig.host}:${proxyConfig.port}`;
+      const proxyParsed = new URL(proxyUrl);
+
+      // 1. 建立到代理的 CONNECT 隧道
+      const connectOptions = {
+        host: proxyParsed.hostname,
+        port: proxyParsed.port || 80,
+        method: 'CONNECT',
+        path: `${target.hostname}:${target.port || (isHttps ? 443 : 80)}`,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      };
+
+      const req = http.request(connectOptions);
+
+      const timeoutId = setTimeout(() => {
+        req.destroy();
+        reject(new Error('Request timeout'));
+      }, timeout);
+
+      req.on('connect', (res, socket, head) => {
+        clearTimeout(timeoutId);
+
+        if (res.statusCode !== 200) {
+          reject(new Error(`CONNECT failed: ${res.statusCode}`));
+          return;
+        }
+
+        // 2. 通过隧道发送实际请求
+        const options: any = {
+          socket: socket,
+          method: 'GET',
+          path: `${target.pathname}${target.search}`,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/vnd.github.v3+json',
+            'Host': target.hostname,
+            ...(this.apiToken ? { 'Authorization': `token ${this.apiToken}` } : {})
+          }
+        };
+
+        const client = isHttps ? https.request(options) : http.request(options);
+
+        client.on('response', (response) => {
+          let data = '';
+          response.on('data', (chunk) => {
+            data += chunk;
+          });
+          response.on('end', () => {
+            const contentType = response.headers['content-type'] || '';
+            let parsedData = data;
+            
+            // 如果是 JSON 格式，尝试解析
+            if (contentType.includes('application/json') || contentType.includes('text/plain')) {
+              try {
+                parsedData = JSON.parse(data);
+              } catch (e) {
+                // 如果解析失败，保持原字符串
+                parsedData = data;
+              }
+            }
+            
+            resolve({
+              status: response.statusCode,
+              headers: response.headers,
+              data: parsedData
+            } as AxiosResponse);
+          });
+        });
+
+        client.on('error', (err) => {
+          reject(err);
+        });
+
+        client.end();
+      });
+
+      req.on('error', (err) => {
+        clearTimeout(timeoutId);
+        reject(err);
+      });
+
+      req.end();
+    });
+  }
+
   private _sleep(seconds: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+  }
+
+  async testProxy(url: string = 'https://api.github.com'): Promise<{ success: boolean; error?: string }> {
+    console.log(`Testing proxy with URL: ${url}`);
+    try {
+      const response = await this.client.get(url, { timeout: 5000 });
+      console.log(`Proxy test successful: ${response.status}`);
+      return { success: true };
+    } catch (error: any) {
+      const errorMessage = error.message || error.toString();
+      console.error(`Proxy test failed: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  getProxyInfo(): { enabled: boolean; proxy?: ProxyConfig } {
+    const proxyConfig = this.proxy !== false ? (this.proxy || this._getProxyFromEnv()) : null;
+    return {
+      enabled: !!proxyConfig,
+      proxy: proxyConfig || undefined
+    };
   }
 }
 

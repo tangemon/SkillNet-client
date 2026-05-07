@@ -5,7 +5,7 @@ import * as path from 'path';
 import { Creator, CreateResult, DEFAULT_MODEL } from './creator';
 import { SkillRelationshipAnalyzer as Analyzer, AnalyzerConfig } from './analyzer';
 import { SkillEvaluator as Evaluator, EvaluatorConfig } from './evaluate';
-import { SkillDownloader, DownloaderConfig } from './downloader';
+import { SkillDownloader, DownloaderConfig, ProxyConfig } from './downloader';
 
 export enum SearchMode {
   Keyword = 'keyword',
@@ -28,6 +28,10 @@ export interface ClientConfig {
   /** LLM API 端点（用于 create/evaluate/analyze），默认: https://api.openai.com/v1 */
   baseUrl?: string;
   githubToken?: string;
+  /** GitHub 镜像 URL，用于加速下载 */
+  githubMirror?: string;
+  /** GitHub 下载代理配置，设置为 false 可禁用代理 */
+  githubProxy?: ProxyConfig | false;
 }
 
 export interface SearchOptions {
@@ -88,7 +92,6 @@ export interface AnalyzeOptions {
   skillsDir: string;
   noSave?: boolean;
   model?: string;
-  local?: boolean;
 }
 
 export interface Relationship {
@@ -110,6 +113,8 @@ export class SkillNetClient {
   private client: AxiosInstance;
   private apiKey?: string;
   private githubToken?: string;
+  private githubMirror?: string;
+  private githubProxy?: ProxyConfig | false;
   private llmBaseUrl: string;
 
   constructor(config: ClientConfig = {}) {
@@ -130,6 +135,14 @@ export class SkillNetClient {
 
     if (config.githubToken) {
       this.githubToken = config.githubToken;
+    }
+
+    if (config.githubMirror !== undefined) {
+      this.githubMirror = config.githubMirror;
+    }
+
+    if (config.githubProxy !== undefined) {
+      this.githubProxy = config.githubProxy;
     }
 
     this.client.interceptors.request.use((config) => {
@@ -218,7 +231,9 @@ export class SkillNetClient {
     const downloaderConfig: DownloaderConfig = {
       apiToken: this.githubToken,
       timeout: 15,
-      maxRetries: 3
+      maxRetries: 3,
+      mirrorUrl: this.githubMirror,
+      proxy: this.githubProxy
     };
 
     const downloader = new SkillDownloader(downloaderConfig);
@@ -368,53 +383,18 @@ export class SkillNetClient {
       throw new Error('Skills directory is required');
     }
 
-    if (options.local) {
-      if (!this.apiKey) {
-        throw new Error('API key is required for local analyze operation');
-      }
-
-      const analyzer = new Analyzer({
-        apiKey: this.apiKey,
-        baseUrl: this.llmBaseUrl,
-        model: options.model
-      });
-
-      const relationships = await analyzer.analyzeLocalSkills(options.skillsDir, !options.noSave);
-      return relationships;
-    } else {
-      if (!this.apiKey) {
-        throw new Error('API key is required for analyze operation');
-      }
-
-      const body: Record<string, any> = {
-        skills_dir: options.skillsDir,
-        base_url: this.llmBaseUrl
-      };
-
-      if (options.noSave) {
-        body.no_save = true;
-      }
-      if (options.model) {
-        body.model = options.model;
-      }
-
-      try {
-        const response = await this.client.post('/analyze', body);
-        const data = response.data;
-
-        return (data.relationships || []).map((rel: any) => ({
-          source: rel.source,
-          type: rel.type,
-          target: rel.target,
-          reason: rel.reason
-        }));
-      } catch (error: any) {
-        if (error.response?.data?.error) {
-          throw new Error(error.response.data.error);
-        }
-        throw error;
-      }
+    if (!this.apiKey) {
+      throw new Error('API key is required for analyze operation');
     }
+
+    const analyzer = new Analyzer({
+      apiKey: this.apiKey,
+      baseUrl: this.llmBaseUrl,
+      model: options.model
+    });
+
+    const relationships = await analyzer.analyzeLocalSkills(options.skillsDir, !options.noSave);
+    return relationships;
   }
 }
 

@@ -5,7 +5,19 @@
  * 1. npm install
  * 2. npx ts-node acceptance-test.ts
  * 
- * 注意：带 🔑 的测试需要配置 API_KEY
+ * 环境变量配置：
+ * - API_KEY: OpenAI API 密钥 (用于 create/evaluate/analyze)
+ * - GITHUB_TOKEN: GitHub Personal Access Token (可选，避免 rate limit)
+ * - SKILLNET_URL: SkillNet API 地址 (可选)
+ * - BASE_URL: LLM API 地址 (可选)
+ * - MODEL: LLM 模型名称 (可选，默认 nebulacoder-v8.0)
+ * 
+ * 示例：
+ * export API_KEY=77f3d8e5-100d-4cca-9689-2fd84240619c
+ * export BASE_URL=https://nebulacoder-maas.zte.com.cn/v1
+ * export MODEL=nebulacoder-v8.0
+ * export GITHUB_TOKEN=ghp_xxx
+ * npx ts-node test/acceptance-test.ts
  */
 
 import { SkillNetClient, SearchMode, SortBy } from '../src';
@@ -14,12 +26,15 @@ import { SkillNetClient, SearchMode, SortBy } from '../src';
 const API_KEY = process.env.API_KEY || '';  // 🔑 需要设置: export API_KEY=sk-xxx
 const SKILLNET_URL = process.env.SKILLNET_URL || 'http://api-skillnet.openkg.cn/v1';
 const LLM_BASE_URL = process.env.BASE_URL || 'https://api.openai.com/v1';  // 🔑 可选: 自定义LLM端点
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';  // 🔑 可选: export GITHUB_TOKEN=ghp_xxx (避免rate limit)
+const MODEL = process.env.MODEL || 'nebulacoder-v8.0';  // 🔑 可选: LLM 模型名称
 // =================================================
 
 const client = new SkillNetClient({
   apiKey: API_KEY || undefined,
   skillnetUrl: SKILLNET_URL,
-  baseUrl: LLM_BASE_URL
+  baseUrl: LLM_BASE_URL,
+  githubToken: GITHUB_TOKEN || undefined
 });
 
 let passed = 0;
@@ -162,7 +177,8 @@ async function runTests() {
     try {
       const result = await client.create({
         prompt: 'A skill for web scraping article titles',
-        outputDir: './test_skills'
+        outputDir: './test_skills',
+        model: MODEL  // 使用正确的模型
       });
       assert(result.success !== undefined, '3.1 从prompt创建返回结果');
       console.log(`   创建结果: ${result.message}`);
@@ -180,7 +196,7 @@ async function runTests() {
       const result = await client.create({
         prompt: 'A skill for data analysis',
         outputDir: './test_skills',
-        model: 'gpt-4o'
+        model: MODEL  // 使用正确的模型
       });
       assert(result.success !== undefined, '3.2 指定model创建返回结果');
       console.log(`   指定model创建结果: ${result.message}`);
@@ -255,10 +271,12 @@ async function runTests() {
   if (!API_KEY) {
     console.log('   ⏭️ 跳过: 未设置 API_KEY');
   } else {
-    // 注意: 需要实际的skills目录
+    // 注意: 需要实际的skills目录，使用 local: true 调用本地 LLM
     try {
       const relationships = await client.analyze({
-        skillsDir: './test_skills'
+        skillsDir: './test_skills',
+        model: MODEL,  // 使用正确的模型
+        local: true  // 使用本地 LLM，而不是服务端 API
       });
       assert(Array.isArray(relationships), '5.1 分析返回数组');
       console.log(`   发现 ${relationships.length} 个关系`);

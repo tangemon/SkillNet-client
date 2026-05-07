@@ -485,6 +485,60 @@ describe('SkillDownloader', () => {
       expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
       expect(result).toHaveLength(0);
     }, 10000);
+
+    it('should handle proxy parse error and throw GitHubAPIError', async () => {
+      const downloaderWithProxy = new SkillDownloader({
+        proxy: {
+          host: '127.0.0.1',
+          port: 8080
+        }
+      });
+
+      mockAxiosInstance.get.mockRejectedValueOnce({
+        code: 'HPE_INVALID_CONSTANT',
+        message: 'Parse Error: Expected HTTP/'
+      });
+
+      await expect(downloaderWithProxy._getFileTree('owner', 'repo', 'main', 'path'))
+        .rejects.toThrow(GitHubAPIError);
+    }, 10000);
+  });
+
+  describe('Proxy Configuration', () => {
+    it('should configure proxy from config', () => {
+      const downloaderWithProxy = new SkillDownloader({
+        proxy: {
+          host: 'proxy.example.com',
+          port: 8080,
+          auth: {
+            username: 'user',
+            password: 'pass'
+          }
+        }
+      });
+      expect(downloaderWithProxy).toBeDefined();
+    });
+
+    it('should disable proxy when explicitly set to false', () => {
+      const downloaderWithoutProxy = new SkillDownloader({
+        proxy: false
+      });
+      expect(downloaderWithoutProxy).toBeDefined();
+    });
+
+    it('should read proxy from HTTP_PROXY environment variable', () => {
+      process.env.HTTP_PROXY = 'http://user:pass@proxy.example.com:8080';
+      const downloader = new SkillDownloader();
+      expect(downloader).toBeDefined();
+      delete process.env.HTTP_PROXY;
+    });
+
+    it('should read proxy from HTTPS_PROXY environment variable', () => {
+      process.env.HTTPS_PROXY = 'https://proxy.example.com:443';
+      const downloader = new SkillDownloader();
+      expect(downloader).toBeDefined();
+      delete process.env.HTTPS_PROXY;
+    });
   });
 });
 

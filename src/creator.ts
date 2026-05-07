@@ -534,7 +534,8 @@ export class Creator {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.apiKey}`
-      }
+      },
+      proxy: false  // 禁用代理，直接访问内部服务
     });
   }
 

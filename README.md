@@ -58,6 +58,51 @@ const client = new SkillNetClient({
 });
 ```
 
+### Proxy Configuration
+
+If you're behind a corporate proxy or need to use a mirror, configure it as follows:
+
+#### Option 1: Environment Variables (Recommended)
+
+```bash
+# Set proxy
+export HTTP_PROXY=http://user:password@proxy.example.com:8080
+export HTTPS_PROXY=https://proxy.example.com:443
+
+# Or set GitHub mirror
+export GITHUB_MIRROR=https://ghfast.top/
+
+# Or set GitHub token for higher rate limits
+export GITHUB_TOKEN=ghp_your_token_here
+```
+
+#### Option 2: Direct Configuration
+
+```typescript
+const client = new SkillNetClient({
+  githubToken: 'ghp_xxx',
+  githubMirror: 'https://ghfast.top/',
+  githubProxy: {
+    host: 'proxy.example.com',
+    port: 8080,
+    auth: {
+      username: 'user',
+      password: 'password'
+    }
+  }
+});
+```
+
+#### Option 3: Disable Proxy
+
+If you need to bypass proxy for direct connections:
+
+```typescript
+const client = new SkillNetClient({
+  githubProxy: false  // Disable proxy completely
+});
+```
+
 ## API Reference
 
 ### Search

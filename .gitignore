@@ -5,3 +5,5 @@ coverage/
 .DS_Store
 reference/
 test_skills/
+test_downloads/
+evaluate_cache_dir/

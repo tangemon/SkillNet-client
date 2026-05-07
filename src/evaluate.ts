@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
+import { SkillDownloader } from './downloader';
 
 export interface EvaluationDimension {
   level: string;
@@ -119,7 +120,8 @@ export class SkillEvaluator {
       timeout: 120000,
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      proxy: false  // 禁用代理，直接访问内部服务
     });
 
     this.client.interceptors.request.use((config) => {
@@ -444,62 +446,25 @@ export class SkillEvaluator {
   }
 
   private async _downloadFromGitHub(url: string, targetDir: string): Promise<string> {
+    // 使用 SkillDownloader 下载文件（支持代理和 CONNECT 隧道）
+    const downloader = new SkillDownloader({
+      apiToken: this.config.githubToken,
+      timeout: 30,
+      maxRetries: 3
+    });
+
     const normalizedUrl = url.replace('/blob/', '/tree/');
-    const match = normalizedUrl.match(/github\.com\/([^\/]+)\/([^\/]+)\/tree\/[^\/]+\/([^\/\?]+)/);
+    const downloadedPath = await downloader.download(normalizedUrl, targetDir);
     
-    if (!match) {
-      throw new Error('Invalid GitHub URL format');
+    if (!downloadedPath) {
+      throw new Error('Download failed');
     }
-
-    const [, owner, repo, skillName] = match;
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${skillName}`;
     
-    const headers: Record<string, string> = {
-      'Accept': 'application/vnd.github.v3+json'
-    };
-    
-    if (this.config.githubToken) {
-      headers['Authorization'] = `token ${this.config.githubToken}`;
-    }
-
-    const response = await axios.get(apiUrl, { headers });
-    const files = response.data;
-
-    const skillDir = path.join(targetDir, skillName);
-    if (!fs.existsSync(skillDir)) {
-      fs.mkdirSync(skillDir, { recursive: true });
-    }
-
-    for (const file of files) {
-      if (file.type === 'file') {
-        const fileResponse = await axios.get(file.download_url);
-        const filePath = path.join(skillDir, file.name);
-        fs.writeFileSync(filePath, fileResponse.data);
-      } else if (file.type === 'dir') {
-        await this._downloadDirectory(file.url, path.join(skillDir, file.name), headers);
-      }
-    }
-
-    return skillDir;
+    return downloadedPath;
   }
 
   private async _downloadDirectory(apiUrl: string, targetDir: string, headers: Record<string, string>): Promise<void> {
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
-    }
-
-    const response = await axios.get(apiUrl, { headers });
-    const files = response.data;
-
-    for (const file of files) {
-      if (file.type === 'file') {
-        const fileResponse = await axios.get(file.download_url);
-        const filePath = path.join(targetDir, file.name);
-        fs.writeFileSync(filePath, fileResponse.data);
-      } else if (file.type === 'dir') {
-        await this._downloadDirectory(file.url, path.join(targetDir, file.name), headers);
-      }
-    }
+    // 这个方法现在由 SkillDownloader 处理
   }
 
   private async _callLLM(prompt: string): Promise<string> {

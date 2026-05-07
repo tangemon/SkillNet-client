@@ -95,7 +95,8 @@ export class SkillRelationshipAnalyzer {
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json'
-      }
+      },
+      proxy: false  // 禁用代理，直接访问内部服务
     });
   }
 

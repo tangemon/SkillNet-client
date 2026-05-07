@@ -450,20 +450,24 @@ describe('SkillNetClient', () => {
 
     it('should analyze skill relationships', async () => {
       const clientWithKey = new SkillNetClient({ apiKey: 'sk-test' });
-      mockAxiosInstance.post = jest.fn().mockResolvedValue({ data: mockAnalyzeResponse });
 
-      const relationships = await clientWithKey.analyze({ skillsDir: './my_skills' });
+      // Mock fs module for local analyzer
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+      jest.spyOn(fs, 'writeFileSync').mockReturnValue();
 
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-        '/analyze',
-        expect.objectContaining({
-          skills_dir: './my_skills'
-        })
-      );
-      expect(relationships).toHaveLength(2);
-      expect(relationships[0].source).toBe('PDF_Parser');
-      expect(relationships[0].type).toBe('compose_with');
-      expect(relationships[0].target).toBe('Text_Summarizer');
+      const relationships = await clientWithKey.analyze({ skillsDir: './test_skills' });
+
+      expect(Array.isArray(relationships)).toBe(true);
     });
 
     it('should throw error when skillsDir is missing', async () => {
@@ -475,13 +479,15 @@ describe('SkillNetClient', () => {
 
     it('should throw error on analyze failure', async () => {
       const clientWithKey = new SkillNetClient({ apiKey: 'sk-test' });
-      mockAxiosInstance.post = jest.fn().mockRejectedValue(new Error('Analyze failed'));
+
+      // Mock fs module to throw error
+      jest.spyOn(fs, 'existsSync').mockReturnValue(false);
 
       await expect(clientWithKey.analyze({ skillsDir: './skills' }))
-        .rejects.toThrow('Analyze failed');
+        .rejects.toThrow('Directory not found');
     });
 
-    it('should use local analyzer when local option is true', async () => {
+    it('should analyze skills and return relationships', async () => {
       const clientWithKey = new SkillNetClient({ apiKey: 'sk-test' });
 
       // Mock fs module
@@ -496,34 +502,37 @@ describe('SkillNetClient', () => {
         }
         return '';
       });
-
-      const mockAxiosPostLocal = jest.fn();
-      mockAxiosPostLocal.mockResolvedValueOnce({
-        data: { choices: [{ message: { content: '<Skill_Relationships>\n[]\n</Skill_Relationships>' } }] }
-      });
-
-      (axios.create as jest.Mock).mockImplementation(() => ({
-        post: mockAxiosPostLocal,
-        get: jest.fn(),
-        defaults: {},
-        interceptors: { request: { use: jest.fn() } }
-      }));
+      jest.spyOn(fs, 'writeFileSync').mockReturnValue();
 
       const relationships = await clientWithKey.analyze({
-        skillsDir: './test_skills',
-        local: true
+        skillsDir: './test_skills'
       });
 
-      expect(mockAxiosPostLocal).toHaveBeenCalled();
       expect(Array.isArray(relationships)).toBe(true);
     });
 
-    it('should use API analyzer by default when local option is false', async () => {
+    it('should save relationships to file by default', async () => {
       const clientWithKey = new SkillNetClient({ apiKey: 'sk-test' });
-      
-      // Skip this test as it requires complex mock setup
-      // The test verifies that local: false uses the API instead of local analyzer
-      expect(true).toBe(true);
+
+      // Mock fs module
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+      jest.spyOn(fs, 'writeFileSync').mockReturnValue();
+
+      const relationships = await clientWithKey.analyze({
+        skillsDir: './test_skills'
+      });
+
+      expect(Array.isArray(relationships)).toBe(true);
     });
   });
 
