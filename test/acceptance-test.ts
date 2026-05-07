@@ -8,7 +8,7 @@
  * 注意：带 🔑 的测试需要配置 API_KEY
  */
 
-import { SkillNetClient, SearchMode, SortBy } from './src';
+import { SkillNetClient, SearchMode, SortBy } from '../src';
 
 // ==================== 配置区域 ====================
 const API_KEY = process.env.API_KEY || '';  // 🔑 需要设置: export API_KEY=sk-xxx
