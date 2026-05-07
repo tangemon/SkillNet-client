@@ -175,16 +175,34 @@ async function runTests() {
       }
     }
 
-    // 3.2 空source校验
+    // 3.2 指定model创建
+    try {
+      const result = await client.create({
+        prompt: 'A skill for data analysis',
+        outputDir: './test_skills',
+        model: 'gpt-4o'
+      });
+      assert(result.success !== undefined, '3.2 指定model创建返回结果');
+      console.log(`   指定model创建结果: ${result.message}`);
+    } catch (e: any) {
+      if (e.message.includes('404')) {
+        console.log(`   ❌ 指定model创建失败 (404): 服务端接口可能未开放`);
+        failed++;
+      } else {
+        console.log(`   ⚠️ 指定model创建结果: ${e.message}`);
+      }
+    }
+
+    // 3.3 空source校验
     try {
       await client.create({ outputDir: './test' });
       failed++;
     } catch (e: any) {
-      assert(e.message.includes('required') || e.message.includes('source'), '3.2 空source抛出错误');
+      assert(e.message.includes('required') || e.message.includes('source'), '3.3 空source抛出错误');
     }
   }
 
-  // 3.3 无API_KEY校验
+  // 3.4 无API_KEY校验
   const clientNoKey = new SkillNetClient();
   try {
     await clientNoKey.create({
@@ -193,7 +211,7 @@ async function runTests() {
     });
     failed++;
   } catch (e: any) {
-    assert(e.message.includes('API key'), '3.3 无API_KEY抛出错误');
+    assert(e.message.includes('API key'), '3.4 无API_KEY抛出错误');
   }
 
   // ==================== 4. Evaluate 测试 🔑 ====================
@@ -228,7 +246,7 @@ async function runTests() {
     await clientNoKey.evaluate({ target: '' });
     failed++;
   } catch (e: any) {
-    assert(e.message.includes('required') || e.message.includes('Target'), '4.2 空target抛出错误');
+    assert(e.message.includes('required') || e.message.includes('Target'), '4.3 空target抛出错误');
   }
 
   // ==================== 5. Analyze 测试 🔑 ====================
@@ -259,7 +277,7 @@ async function runTests() {
     await clientNoKey.analyze({ skillsDir: '' });
     failed++;
   } catch (e: any) {
-    assert(e.message.includes('required') || e.message.includes('directory'), '5.2 空directory抛出错误');
+    assert(e.message.includes('required') || e.message.includes('directory'), '5.3 空directory抛出错误');
   }
 
   // ==================== 6. 客户端配置测试 ====================

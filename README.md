@@ -117,10 +117,11 @@ const result = await client.create({
   outputDir: './skills'
 });
 
-// From prompt
+// From prompt with custom model
 const result = await client.create({
   prompt: 'A skill for web scraping',
-  outputDir: './skills'
+  outputDir: './skills',
+  model: 'gpt-4o'
 });
 ```
 

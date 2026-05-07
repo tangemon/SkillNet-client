@@ -366,6 +366,26 @@ describe('SkillNetClient', () => {
       );
     });
 
+    it('should create skill with custom model', async () => {
+      const clientWithKey = new SkillNetClient({ apiKey: 'sk-test' });
+      mockAxiosInstance.post = jest.fn().mockResolvedValue({ data: mockCreateResponse });
+
+      await clientWithKey.create({
+        prompt: 'A skill for web scraping',
+        outputDir: './skills',
+        model: 'gpt-4o'
+      });
+
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+        '/create',
+        expect.objectContaining({
+          prompt: 'A skill for web scraping',
+          model: 'gpt-4o'
+        }),
+        expect.any(Object)
+      );
+    });
+
     it('should throw error when no source is provided', async () => {
       const clientWithKey = new SkillNetClient({ apiKey: 'sk-test' });
       mockAxiosInstance.post = jest.fn().mockResolvedValue({ data: mockCreateResponse });

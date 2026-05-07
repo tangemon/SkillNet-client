@@ -41,6 +41,7 @@ export interface CreateOptions {
   officeFile?: string;
   prompt?: string;
   outputDir: string;
+  model?: string;
 }
 
 export interface CreateResult {
@@ -253,6 +254,9 @@ export class SkillNetClient {
     }
     if (options.prompt) {
       body.prompt = options.prompt;
+    }
+    if (options.model) {
+      body.model = options.model;
     }
 
     try {
