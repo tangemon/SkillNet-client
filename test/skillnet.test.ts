@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as fs from 'fs';
-import { SkillNetClient, SearchMode, SortBy, EvaluationResult, Relationship } from './skillnet';
-import { SkillRelationshipAnalyzer, AnalyzerConfig } from './analyzer';
+import { SkillNetClient, SearchMode, SortBy, EvaluationResult, Relationship } from '../src/skillnet';
+import { SkillRelationshipAnalyzer, AnalyzerConfig } from '../src/analyzer';
 
 const mockAxiosInstance = {
   get: jest.fn(),

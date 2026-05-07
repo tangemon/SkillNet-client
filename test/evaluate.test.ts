@@ -1,6 +1,6 @@
 import axios from 'axios';
 import * as fs from 'fs';
-import { SkillEvaluator, EvaluatorConfig, EvaluationResult } from './evaluate';
+import { SkillEvaluator, EvaluatorConfig, EvaluationResult } from '../src/evaluate';
 
 const mockAxiosInstance = {
   post: jest.fn(),
