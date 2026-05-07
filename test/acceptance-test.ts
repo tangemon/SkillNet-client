@@ -10,12 +10,12 @@
  * - GITHUB_TOKEN: GitHub Personal Access Token (可选，避免 rate limit)
  * - SKILLNET_URL: SkillNet API 地址 (可选)
  * - BASE_URL: LLM API 地址 (可选)
- * - MODEL: LLM 模型名称 (可选，默认 nebulacoder-v8.0)
+ * - MODEL: LLM 模型名称 (可选，默认 gpt4.0)
  * 
  * 示例：
- * export API_KEY=77f3d8e5-100d-4cca-9689-2fd84240619c
- * export BASE_URL=https://nebulacoder-maas.zte.com.cn/v1
- * export MODEL=nebulacoder-v8.0
+ * export API_KEY=xxxxxx
+ * export BASE_URL=https://openai.com/v1
+ * export MODEL=chatgpt
  * export GITHUB_TOKEN=ghp_xxx
  * npx ts-node test/acceptance-test.ts
  */
@@ -27,7 +27,7 @@ const API_KEY = process.env.API_KEY || '';  // 🔑 需要设置: export API_KEY
 const SKILLNET_URL = process.env.SKILLNET_URL || 'http://api-skillnet.openkg.cn/v1';
 const LLM_BASE_URL = process.env.BASE_URL || 'https://api.openai.com/v1';  // 🔑 可选: 自定义LLM端点
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';  // 🔑 可选: export GITHUB_TOKEN=ghp_xxx (避免rate limit)
-const MODEL = process.env.MODEL || 'nebulacoder-v8.0';  // 🔑 可选: LLM 模型名称
+const MODEL = process.env.MODEL || 'gpt4.0';  // 🔑 可选: LLM 模型名称
 // =================================================
 
 const client = new SkillNetClient({
