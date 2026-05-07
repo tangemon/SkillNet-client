@@ -1,5 +1,6 @@
 export { SkillNetClient, SearchMode, SortBy } from './skillnet';
 export { Creator } from './creator';
+export { SkillRelationshipAnalyzer as Analyzer } from './analyzer';
 export type {
   SearchOptions,
   SkillInfo,
@@ -10,8 +11,7 @@ export type {
   EvaluateOptions,
   AnalyzeOptions,
   Relationship,
-  ClientConfig,
-  AnalyzerConfig
+  ClientConfig
 } from './skillnet';
 export type {
   CreatorConfig,
@@ -23,3 +23,4 @@ export type {
   SkillCandidate,
   GitHubRepoData
 } from './creator';
+export type { AnalyzerConfig } from './analyzer';

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as fs from 'fs';
 import { SkillNetClient, SearchMode, SortBy, EvaluationResult, Relationship } from './skillnet';
+import { SkillRelationshipAnalyzer, AnalyzerConfig } from './analyzer';
 
 const mockAxiosInstance = {
   get: jest.fn(),
@@ -513,291 +514,6 @@ describe('SkillNetClient', () => {
   });
 });
 
-describe('SkillRelationshipAnalyzer', () => {
-  let analyzer: any;
-  const mockAxiosPost = jest.fn();
-  const mockAxiosGet = jest.fn();
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockAxiosPost.mockReset();
-    mockAxiosGet.mockReset();
-
-    (axios.create as jest.Mock).mockImplementation(() => ({
-      post: mockAxiosPost,
-      get: mockAxiosGet,
-      defaults: {},
-      interceptors: { request: { use: jest.fn() } }
-    }));
-  });
-
-  describe('Constructor', () => {
-    it('should create analyzer with apiKey', () => {
-      const { Analyzer } = require('./skillnet');
-      const analyzerInstance = new Analyzer({ apiKey: 'sk-test-key' });
-      expect(analyzerInstance).toBeDefined();
-    });
-
-    it('should throw error when apiKey is missing', () => {
-      const { Analyzer } = require('./skillnet');
-      expect(() => new Analyzer({} as any)).toThrow('API key is required');
-    });
-
-    it('should use custom baseUrl when provided', () => {
-      const { Analyzer } = require('./skillnet');
-      const analyzerInstance = new Analyzer({
-        apiKey: 'sk-test-key',
-        baseUrl: 'https://custom.llm.api.com/v1'
-      });
-      expect(analyzerInstance).toBeDefined();
-    });
-
-    it('should use custom model when provided', () => {
-      const { Analyzer } = require('./skillnet');
-      const analyzerInstance = new Analyzer({
-        apiKey: 'sk-test-key',
-        model: 'gpt-4o'
-      });
-      expect(analyzerInstance).toBeDefined();
-    });
-  });
-
-  describe('analyzeLocalSkills', () => {
-    const mockRelationshipResponse = `<Skill_Relationships>
-[
-  {
-    "source": "pdf-processor",
-    "target": "text-summarizer",
-    "type": "compose_with",
-    "reason": "PDF processor extracts text that text summarizer consumes"
-  },
-  {
-    "source": "web-scraper",
-    "target": "html-parser",
-    "type": "depend_on",
-    "reason": "Web scraper requires html-parser to process HTML content"
-  }
-]
-</Skill_Relationships>`;
-
-it('should analyze skills and return relationships', async () => {
-      const { Analyzer } = await import('./skillnet');
-
-      // Skip this test as it requires complex mock setup
-      expect(true).toBe(true);
-    });
-
-    it('should throw error when directory does not exist', async () => {
-      const { Analyzer } = await import('./skillnet');
-
-      // Mock fs.existsSync to return false for non-existent directory
-      jest.spyOn(fs, 'existsSync').mockReturnValue(false);
-
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      await expect(analyzer.analyzeLocalSkills('./non_existent_dir'))
-        .rejects.toThrow('Directory not found');
-    });
-
-    it('should return empty array when less than 2 skills found', async () => {
-      const { Analyzer } = await import('./skillnet');
-
-      // Mock fs.existsSync to return true for directory
-      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
-      jest.spyOn(fs, 'readdirSync').mockReturnValue([createMockDirent('single-skill', true)] as any);
-      jest.spyOn(fs, 'readFileSync').mockReturnValue('');
-
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
-      expect(relationships).toHaveLength(0);
-    });
-
-    it('should save relationships to file when saveToFile is true', async () => {
-      const { Analyzer } = await import('./skillnet');
-
-      // Skip this test as it requires complex mock setup
-      expect(true).toBe(true);
-    });
-
-    it('should not save to file when saveToFile is false', async () => {
-      const { Analyzer } = await import('./skillnet');
-
-      // Skip this test as it requires complex mock setup
-      expect(true).toBe(true);
-    });
-
-    it('should handle LLM API errors gracefully', async () => {
-      const { Analyzer } = await import('./skillnet');
-
-      mockAxiosPost.mockRejectedValueOnce(new Error('API Error'));
-
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
-      expect(relationships).toHaveLength(0);
-    });
-
-    it('should handle invalid JSON response', async () => {
-      const { Analyzer } = await import('./skillnet');
-
-      mockAxiosPost.mockResolvedValueOnce({
-        data: { choices: [{ message: { content: 'Invalid JSON' } }] }
-      });
-
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
-      expect(relationships).toHaveLength(0);
-    });
-
-    it('should filter out relationships with invalid skill names', async () => {
-      const { Analyzer } = await import('./skillnet');
-
-      const invalidResponse = `<Skill_Relationships>
-[
-  {
-    "source": "valid-skill",
-    "target": "non-existent-skill",
-    "type": "compose_with",
-    "reason": "Test"
-  }
-]
-</Skill_Relationships>`;
-
-      mockAxiosPost.mockResolvedValueOnce({
-        data: { choices: [{ message: { content: invalidResponse } }] }
-      });
-
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
-      expect(relationships).toHaveLength(0);
-    });
-
-    it('should filter out relationships with invalid types', async () => {
-      const { Analyzer } = await import('./skillnet');
-
-      const invalidTypeResponse = `<Skill_Relationships>
-[
-  {
-    "source": "skill-a",
-    "target": "skill-b",
-    "type": "invalid_type",
-    "reason": "Test"
-  }
-]
-</Skill_Relationships>`;
-
-      mockAxiosPost.mockResolvedValueOnce({
-        data: { choices: [{ message: { content: invalidTypeResponse } }] }
-      });
-
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
-      expect(relationships).toHaveLength(0);
-    });
-
-    it('should filter out self-referencing relationships', async () => {
-      const { Analyzer } = await import('./skillnet');
-
-      const selfRefResponse = `<Skill_Relationships>
-[
-  {
-    "source": "skill-a",
-    "target": "skill-a",
-    "type": "compose_with",
-    "reason": "Test"
-  }
-]
-</Skill_Relationships>`;
-
-      mockAxiosPost.mockResolvedValueOnce({
-        data: { choices: [{ message: { content: selfRefResponse } }] }
-      });
-
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
-      expect(relationships).toHaveLength(0);
-    });
-  });
-
-  describe('_extractDescription', () => {
-    it('should extract description from YAML frontmatter', () => {
-      const { Analyzer } = require('./skillnet');
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const content = `---
-name: test-skill
-description: This is a test skill description
----
-# Test Skill
-Some content here`;
-
-      const description = analyzer._extractDescription(content);
-      expect(description).toBe('This is a test skill description');
-    });
-
-    it('should extract first paragraph when no frontmatter', () => {
-      const { Analyzer } = require('./skillnet');
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const content = `# Test Skill
-This is the first paragraph.
-This is the second paragraph.`;
-
-      const description = analyzer._extractDescription(content);
-      expect(description).toBe('This is the first paragraph.');
-    });
-
-    it('should return default description when no content', () => {
-      const { Analyzer } = require('./skillnet');
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const description = analyzer._extractDescription('');
-      expect(description).toBe('No description available.');
-    });
-  });
-
-  describe('_extractJsonFromTags', () => {
-    it('should extract JSON from XML-style tags', () => {
-      const { Analyzer } = require('./skillnet');
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const content = `<Skill_Relationships>
-[{"source": "skill-a", "target": "skill-b", "type": "compose_with"}]
-</Skill_Relationships>`;
-
-      const json = analyzer._extractJsonFromTags(content, 'Skill_Relationships');
-      expect(json).toContain('skill-a');
-      expect(json).not.toContain('<Skill_Relationships>');
-    });
-
-    it('should handle JSON without tags', () => {
-      const { Analyzer } = require('./skillnet');
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const content = '[{"source": "skill-a", "target": "skill-b", "type": "compose_with"}]';
-
-      const json = analyzer._extractJsonFromTags(content, 'Skill_Relationships');
-      expect(json).toContain('skill-a');
-    });
-
-    it('should handle JSON with markdown code blocks', () => {
-      const { Analyzer } = require('./skillnet');
-      analyzer = new Analyzer({ apiKey: 'sk-test-key' });
-
-      const content = '```json\n[{"source": "skill-a", "target": "skill-b", "type": "compose_with"}]\n```';
-
-      const json = analyzer._extractJsonFromTags(content, 'Skill_Relationships');
-      expect(json).toContain('skill-a');
-      expect(json).not.toContain('```');
-    });
-  });
-});
-
 describe('Type Definitions', () => {
   it('should export SearchMode enum', () => {
     expect(SearchMode.Keyword).toBe('keyword');
@@ -832,5 +548,677 @@ describe('Type Definitions', () => {
     expect(relationship.source).toBe('SkillA');
     expect(relationship.type).toBe('compose_with');
     expect(relationship.target).toBe('SkillB');
+  });
+});
+
+describe('SkillRelationshipAnalyzer (analyzer.ts)', () => {
+  describe('Constructor', () => {
+    it('should create analyzer with valid apiKey', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      expect(analyzer).toBeDefined();
+    });
+
+    it('should throw error when apiKey is missing', () => {
+      expect(() => new SkillRelationshipAnalyzer({} as AnalyzerConfig))
+        .toThrow('API key is required');
+    });
+
+    it('should throw error when apiKey is empty string', () => {
+      expect(() => new SkillRelationshipAnalyzer({ apiKey: '' }))
+        .toThrow('API key is required');
+    });
+
+    it('should throw error when apiKey is only whitespace', () => {
+      expect(() => new SkillRelationshipAnalyzer({ apiKey: '   ' }))
+        .toThrow('API key is required');
+    });
+
+    it('should use custom baseUrl when provided', () => {
+      const analyzer = new SkillRelationshipAnalyzer({
+        apiKey: 'sk-test-key',
+        baseUrl: 'https://custom.llm.api.com/v1'
+      });
+      expect(analyzer).toBeDefined();
+    });
+
+    it('should use custom model when provided', () => {
+      const analyzer = new SkillRelationshipAnalyzer({
+        apiKey: 'sk-test-key',
+        model: 'gpt-4o'
+      });
+      expect(analyzer).toBeDefined();
+    });
+
+    it('should use default model when not provided', () => {
+      const analyzer = new SkillRelationshipAnalyzer({
+        apiKey: 'sk-test-key'
+      });
+      expect(analyzer).toBeDefined();
+    });
+  });
+
+  describe('analyzeLocalSkills', () => {
+    const mockRelationshipResponse = `<Skill_Relationships>
+[
+  {
+    "source": "pdf-processor",
+    "target": "text-summarizer",
+    "type": "compose_with",
+    "reason": "PDF processor extracts text that text summarizer consumes"
+  },
+  {
+    "source": "web-scraper",
+    "target": "html-parser",
+    "type": "depend_on",
+    "reason": "Web scraper requires html-parser to process HTML content"
+  }
+]
+</Skill_Relationships>`;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should throw error when directory does not exist', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      await expect(analyzer.analyzeLocalSkills('./non_existent_dir'))
+        .rejects.toThrow('Directory not found');
+    });
+
+    it('should return empty array when less than 2 skills found', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('single-skill', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockReturnValue('');
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
+      expect(relationships).toHaveLength(0);
+    });
+
+    it('should log warning when no skills found', async () => {
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([]);
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Not enough skills found to analyze relationships (need at least 2).'
+      );
+      expect(relationships).toHaveLength(0);
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should analyze skills and return valid relationships', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+      jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+
+      const validRelationshipResponse = `<Skill_Relationships>
+[
+  {
+    "source": "skill-a",
+    "target": "skill-b",
+    "type": "compose_with",
+    "reason": "Skill A and Skill B are often used together"
+  }
+]
+</Skill_Relationships>`;
+
+      const mockAxiosPost = jest.fn().mockResolvedValue({
+        data: { choices: [{ message: { content: validRelationshipResponse } }] }
+      });
+
+      (axios.create as jest.Mock).mockImplementation(() => ({
+        post: mockAxiosPost,
+        get: jest.fn(),
+        defaults: {},
+        interceptors: { request: { use: jest.fn() } }
+      }));
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const relationships = await analyzer.analyzeLocalSkills('./test_skills', true);
+
+      expect(relationships).toHaveLength(1);
+      expect(relationships[0]).toEqual({
+        source: 'skill-a',
+        target: 'skill-b',
+        type: 'compose_with',
+        reason: 'Skill A and Skill B are often used together'
+      });
+    });
+
+    it('should save relationships to file when saveToFile is true', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+      const writeFileSpy = jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+
+      const validRelationshipResponse = `<Skill_Relationships>
+[
+  {
+    "source": "skill-a",
+    "target": "skill-b",
+    "type": "compose_with",
+    "reason": "Test"
+  }
+]
+</Skill_Relationships>`;
+
+      const mockAxiosPost = jest.fn().mockResolvedValue({
+        data: { choices: [{ message: { content: validRelationshipResponse } }] }
+      });
+
+      (axios.create as jest.Mock).mockImplementation(() => ({
+        post: mockAxiosPost,
+        get: jest.fn(),
+        defaults: {},
+        interceptors: { request: { use: jest.fn() } }
+      }));
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      await analyzer.analyzeLocalSkills('./test_skills', true);
+
+      expect(writeFileSpy).toHaveBeenCalledWith(
+        expect.stringContaining('relationships.json'),
+        expect.any(String),
+        'utf-8'
+      );
+    });
+
+    it('should not save to file when saveToFile is false', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+      const writeFileSpy = jest.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+
+      const mockAxiosPost = jest.fn().mockResolvedValue({
+        data: { choices: [{ message: { content: mockRelationshipResponse } }] }
+      });
+
+      (axios.create as jest.Mock).mockImplementation(() => ({
+        post: mockAxiosPost,
+        get: jest.fn(),
+        defaults: {},
+        interceptors: { request: { use: jest.fn() } }
+      }));
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      await analyzer.analyzeLocalSkills('./test_skills', false);
+
+      expect(writeFileSpy).not.toHaveBeenCalled();
+    });
+
+    it('should handle LLM API errors gracefully', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+
+      const mockAxiosPost = jest.fn().mockRejectedValue(new Error('API Error'));
+
+      (axios.create as jest.Mock).mockImplementation(() => ({
+        post: mockAxiosPost,
+        get: jest.fn(),
+        defaults: {},
+        interceptors: { request: { use: jest.fn() } }
+      }));
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to analyze relationships: API Error'
+      );
+      expect(relationships).toHaveLength(0);
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle invalid JSON response', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+
+      const mockAxiosPost = jest.fn().mockResolvedValue({
+        data: { choices: [{ message: { content: 'Invalid JSON' } }] }
+      });
+
+      (axios.create as jest.Mock).mockImplementation(() => ({
+        post: mockAxiosPost,
+        get: jest.fn(),
+        defaults: {},
+        interceptors: { request: { use: jest.fn() } }
+      }));
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
+
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to parse JSON content');
+      expect(relationships).toHaveLength(0);
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should filter out relationships with invalid skill names', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+
+      const invalidResponse = `<Skill_Relationships>
+[
+  {
+    "source": "valid-skill",
+    "target": "non-existent-skill",
+    "type": "compose_with",
+    "reason": "Test"
+  }
+]
+</Skill_Relationships>`;
+
+      const mockAxiosPost = jest.fn().mockResolvedValue({
+        data: { choices: [{ message: { content: invalidResponse } }] }
+      });
+
+      (axios.create as jest.Mock).mockImplementation(() => ({
+        post: mockAxiosPost,
+        get: jest.fn(),
+        defaults: {},
+        interceptors: { request: { use: jest.fn() } }
+      }));
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
+
+      expect(relationships).toHaveLength(0);
+    });
+
+    it('should filter out relationships with invalid types', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+
+      const invalidTypeResponse = `<Skill_Relationships>
+[
+  {
+    "source": "skill-a",
+    "target": "skill-b",
+    "type": "invalid_type",
+    "reason": "Test"
+  }
+]
+</Skill_Relationships>`;
+
+      const mockAxiosPost = jest.fn().mockResolvedValue({
+        data: { choices: [{ message: { content: invalidTypeResponse } }] }
+      });
+
+      (axios.create as jest.Mock).mockImplementation(() => ({
+        post: mockAxiosPost,
+        get: jest.fn(),
+        defaults: {},
+        interceptors: { request: { use: jest.fn() } }
+      }));
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
+
+      expect(relationships).toHaveLength(0);
+    });
+
+    it('should filter out self-referencing relationships', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+
+      const selfRefResponse = `<Skill_Relationships>
+[
+  {
+    "source": "skill-a",
+    "target": "skill-a",
+    "type": "compose_with",
+    "reason": "Test"
+  }
+]
+</Skill_Relationships>`;
+
+      const mockAxiosPost = jest.fn().mockResolvedValue({
+        data: { choices: [{ message: { content: selfRefResponse } }] }
+      });
+
+      (axios.create as jest.Mock).mockImplementation(() => ({
+        post: mockAxiosPost,
+        get: jest.fn(),
+        defaults: {},
+        interceptors: { request: { use: jest.fn() } }
+      }));
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
+
+      expect(relationships).toHaveLength(0);
+    });
+
+    it('should handle relationships in nested object format', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: test\ndescription: Test skill\n---\n# Test';
+        }
+        return '';
+      });
+
+      const nestedResponse = `<Skill_Relationships>
+{
+  "relationships": [
+    {
+      "source": "skill-a",
+      "target": "skill-b",
+      "type": "compose_with",
+      "reason": "Test relationship"
+    }
+  ]
+}
+</Skill_Relationships>`;
+
+      const mockAxiosPost = jest.fn().mockResolvedValue({
+        data: { choices: [{ message: { content: nestedResponse } }] }
+      });
+
+      (axios.create as jest.Mock).mockImplementation(() => ({
+        post: mockAxiosPost,
+        get: jest.fn(),
+        defaults: {},
+        interceptors: { request: { use: jest.fn() } }
+      }));
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const relationships = await analyzer.analyzeLocalSkills('./test_skills');
+
+      expect(relationships).toHaveLength(1);
+      expect(relationships[0].source).toBe('skill-a');
+      expect(relationships[0].target).toBe('skill-b');
+    });
+  });
+
+  describe('_extractDescription', () => {
+    it('should extract description from YAML frontmatter', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const content = `---
+name: test-skill
+description: This is a test skill description
+---
+# Test Skill
+Some content here`;
+
+      const description = analyzer._extractDescription(content);
+      expect(description).toBe('This is a test skill description');
+    });
+
+    it('should extract description with quotes from frontmatter', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const content = `---
+name: test-skill
+description: "This is a quoted description"
+---
+# Test Skill`;
+
+      const description = analyzer._extractDescription(content);
+      expect(description).toBe('This is a quoted description');
+    });
+
+    it('should extract first paragraph when no frontmatter', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const content = `# Test Skill
+This is the first paragraph.
+This is the second paragraph.`;
+
+      const description = analyzer._extractDescription(content);
+      expect(description).toBe('This is the first paragraph.');
+    });
+
+    it('should return default description when no content', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const description = analyzer._extractDescription('');
+      expect(description).toBe('No description available.');
+    });
+
+    it('should skip headers when extracting first paragraph', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const content = `# Header 1
+## Header 2
+### Header 3
+This is the actual content.`;
+
+      const description = analyzer._extractDescription(content);
+      expect(description).toBe('This is the actual content.');
+    });
+
+    it('should skip code blocks when extracting description', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const content = `# Test
+\`\`\`python
+code block
+\`\`\`
+This is the real description.`;
+
+      const description = analyzer._extractDescription(content);
+      expect(description).toBe('This is the real description.');
+    });
+  });
+
+  describe('_extractJsonFromTags', () => {
+    it('should extract JSON from XML-style tags', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const content = `<Skill_Relationships>
+[{"source": "skill-a", "target": "skill-b", "type": "compose_with"}]
+</Skill_Relationships>`;
+
+      const json = analyzer._extractJsonFromTags(content, 'Skill_Relationships');
+      expect(json).toContain('skill-a');
+      expect(json).not.toContain('<Skill_Relationships>');
+      expect(json).not.toContain('</Skill_Relationships>');
+    });
+
+    it('should handle JSON without tags', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const content = '[{"source": "skill-a", "target": "skill-b", "type": "compose_with"}]';
+
+      const json = analyzer._extractJsonFromTags(content, 'Skill_Relationships');
+      expect(json).toContain('skill-a');
+    });
+
+    it('should handle JSON with markdown code blocks', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const content = '```json\n[{"source": "skill-a", "target": "skill-b", "type": "compose_with"}]\n```';
+
+      const json = analyzer._extractJsonFromTags(content, 'Skill_Relationships');
+      expect(json).toContain('skill-a');
+      expect(json).not.toContain('```');
+    });
+
+    it('should handle JSON with triple backticks', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const content = '```\n[{"source": "skill-a", "target": "skill-b"}]\n```';
+
+      const json = analyzer._extractJsonFromTags(content, 'Skill_Relationships');
+      expect(json).toContain('skill-a');
+      expect(json).not.toContain('```');
+    });
+
+    it('should trim whitespace from extracted content', () => {
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+
+      const content = `  <Skill_Relationships>
+  [{"source": "skill-a"}]
+  </Skill_Relationships>  `;
+
+      const json = analyzer._extractJsonFromTags(content, 'Skill_Relationships');
+      expect(json).toBe('[{"source": "skill-a"}]');
+    });
+  });
+
+  describe('loadSkillsMetadata', () => {
+    it('should load skills metadata from SKILL.md files', () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('skill-b', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('skill-a')) {
+          return '---\nname: skill-a\ndescription: Skill A description\n---\n# Skill A';
+        }
+        if (path.includes('skill-b')) {
+          return '---\nname: skill-b\ndescription: Skill B description\n---\n# Skill B';
+        }
+        return '';
+      });
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const metadata = analyzer.loadSkillsMetadata('./test_skills');
+
+      expect(metadata).toHaveLength(2);
+      expect(metadata[0].name).toBe('skill-a');
+      expect(metadata[0].description).toBe('Skill A description');
+      expect(metadata[1].name).toBe('skill-b');
+      expect(metadata[1].description).toBe('Skill B description');
+    });
+
+    it('should handle missing SKILL.md files gracefully', () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-no-md', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockReturnValue('');
+
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const metadata = analyzer.loadSkillsMetadata('./test_skills');
+
+      expect(metadata).toHaveLength(1);
+      expect(metadata[0].name).toBe('skill-no-md');
+      expect(metadata[0].description).toBe('No description available.');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should return empty array when directory does not exist', () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const metadata = analyzer.loadSkillsMetadata('./non_existent');
+
+      expect(metadata).toHaveLength(0);
+    });
+
+    it('should skip files in directory', () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-a', true),
+        createMockDirent('readme.md', false)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.includes('SKILL.md')) {
+          return '---\nname: skill-a\ndescription: Skill A\n---\n# Skill A';
+        }
+        return '';
+      });
+
+      const analyzer = new SkillRelationshipAnalyzer({ apiKey: 'sk-test-key' });
+      const metadata = analyzer.loadSkillsMetadata('./test_skills');
+
+      expect(metadata).toHaveLength(1);
+      expect(metadata[0].name).toBe('skill-a');
+    });
   });
 });
