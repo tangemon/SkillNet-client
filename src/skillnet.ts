@@ -5,6 +5,7 @@ import * as path from 'path';
 import { Creator, CreateResult, DEFAULT_MODEL } from './creator';
 import { SkillRelationshipAnalyzer as Analyzer, AnalyzerConfig } from './analyzer';
 import { SkillEvaluator as Evaluator, EvaluatorConfig } from './evaluate';
+import { SkillDownloader, DownloaderConfig } from './downloader';
 
 export enum SearchMode {
   Keyword = 'keyword',
@@ -212,28 +213,30 @@ export class SkillNetClient {
       throw new Error('URL is required');
     }
 
-    const params: Record<string, any> = {
-      url: options.url
+    const targetDir = options.targetDir || DEFAULT_DOWNLOAD_DIR;
+
+    const downloaderConfig: DownloaderConfig = {
+      apiToken: this.githubToken,
+      timeout: 15,
+      maxRetries: 3
     };
 
-    if (options.targetDir) {
-      params.target_dir = options.targetDir;
-    } else {
-      params.target_dir = DEFAULT_DOWNLOAD_DIR;
-    }
+    const downloader = new SkillDownloader(downloaderConfig);
 
     try {
-      const response = await this.client.get('/download', { params });
-      const data = response.data;
+      const result = await downloader.download(options.url, targetDir);
 
-      if (!data.success) {
+      if (!result) {
         throw new Error('Download failed');
       }
 
-      return data.path;
+      return result;
     } catch (error: any) {
       if (error.response?.data?.error) {
         throw new Error(error.response.data.error);
+      }
+      if (error.statusCode) {
+        throw new Error('Download failed');
       }
       throw error;
     }

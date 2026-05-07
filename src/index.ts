@@ -1,6 +1,7 @@
 export { SkillNetClient, SearchMode, SortBy } from './skillnet';
 export { Creator } from './creator';
 export { SkillRelationshipAnalyzer as Analyzer } from './analyzer';
+export { SkillDownloader, GitHubAPIError } from './downloader';
 export type {
   SearchOptions,
   SkillInfo,
@@ -24,3 +25,4 @@ export type {
   GitHubRepoData
 } from './creator';
 export type { AnalyzerConfig } from './analyzer';
+export type { DownloaderConfig, FileInfo } from './downloader';

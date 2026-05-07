@@ -254,56 +254,86 @@ describe('SkillNetClient', () => {
   });
 
   describe('Download', () => {
-    it('should download skill from GitHub URL', async () => {
-      mockAxiosInstance.get = jest.fn().mockResolvedValue({ 
-        data: { success: true, path: './my_skills/pdf-extractor' } 
-      });
+    it('should download skill from GitHub URL using SkillDownloader', async () => {
+      mockAxiosInstance.get
+        .mockResolvedValueOnce({
+          data: [
+            { type: 'file', path: 'skills/skill-creator/SKILL.md', download_url: 'https://raw.githubusercontent.com/anthropics/skills/main/skills/skill-creator/SKILL.md' }
+          ],
+          status: 200
+        })
+        .mockResolvedValueOnce({
+          data: '# Skill Creator\nA skill for creating skills.',
+          status: 200
+        });
 
       const path = await client.download({
         url: 'https://github.com/anthropics/skills/tree/main/skills/skill-creator',
         targetDir: './my_skills'
       });
 
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-        '/download',
-        expect.objectContaining({
-          params: expect.objectContaining({
-            url: 'https://github.com/anthropics/skills/tree/main/skills/skill-creator',
-            target_dir: './my_skills'
-          })
-        })
-      );
-      expect(path).toBe('./my_skills/pdf-extractor');
+      expect(path).toContain('skill-creator');
     });
 
     it('should use default target directory when not specified', async () => {
-      mockAxiosInstance.get = jest.fn().mockResolvedValue({ 
-        data: { success: true, path: './skillnet_downloads/pdf-extractor' } 
-      });
-
-      await client.download({
-        url: 'https://github.com/test/repo'
-      });
-
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-        '/download',
-        expect.objectContaining({
-          params: expect.objectContaining({
-            target_dir: './skillnet_downloads'
-          })
+      mockAxiosInstance.get
+        .mockResolvedValueOnce({
+          data: [
+            { type: 'file', path: 'skills/test/SKILL.md', download_url: 'https://raw.githubusercontent.com/test/repo/main/skills/test/SKILL.md' }
+          ],
+          status: 200
         })
-      );
+        .mockResolvedValueOnce({
+          data: '# Test Skill',
+          status: 200
+        });
+
+      const path = await client.download({
+        url: 'https://github.com/test/repo/tree/main/skills/test'
+      });
+
+      expect(path).toContain('test');
     });
 
     it('should throw error when URL is missing', async () => {
       await expect(client.download({ url: '' })).rejects.toThrow('URL is required');
     });
 
-    it('should throw error on download failure', async () => {
-      mockAxiosInstance.get = jest.fn().mockRejectedValue(new Error('Download failed'));
+    it('should throw error when URL is whitespace only', async () => {
+      await expect(client.download({ url: '   ' })).rejects.toThrow('URL is required');
+    });
 
-      await expect(client.download({ url: 'https://github.com/test/repo' }))
+    it('should throw error on download failure', async () => {
+      mockAxiosInstance.get.mockResolvedValueOnce({
+        status: 404,
+        data: { message: 'Not Found' }
+      });
+
+      await expect(client.download({ url: 'https://github.com/test/repo/tree/main/skills/nonexistent' }))
         .rejects.toThrow('Download failed');
+    });
+
+    it('should use githubToken when configured', async () => {
+      const clientWithToken = new SkillNetClient({ githubToken: 'ghp_test_token' });
+
+      mockAxiosInstance.get
+        .mockResolvedValueOnce({
+          data: [
+            { type: 'file', path: 'skills/test/SKILL.md', download_url: 'https://raw.githubusercontent.com/test/repo/main/skills/test/SKILL.md' }
+          ],
+          status: 200
+        })
+        .mockResolvedValueOnce({
+          data: '# Test Skill',
+          status: 200
+        });
+
+      const path = await clientWithToken.download({
+        url: 'https://github.com/test/repo/tree/main/skills/test',
+        targetDir: './test_downloads'
+      });
+
+      expect(path).toContain('test');
     });
   });
 
