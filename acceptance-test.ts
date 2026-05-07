@@ -136,8 +136,12 @@ async function runTests() {
     assert(path !== undefined, '2.1 下载返回路径');
     console.log(`   下载路径: ${path}`);
   } catch (e: any) {
-    console.log(`   ⚠️ 下载结果: ${e.message}`);
-    // 下载可能失败，但SDK应该正确处理
+    if (e.message.includes('404')) {
+      console.log(`   ❌ 下载失败 (404): 服务端接口可能未开放`);
+      failed++;
+    } else {
+      console.log(`   ⚠️ 下载结果: ${e.message}`);
+    }
   }
 
   // 2.2 空URL校验
@@ -163,7 +167,12 @@ async function runTests() {
       assert(result.success !== undefined, '3.1 从prompt创建返回结果');
       console.log(`   创建结果: ${result.message}`);
     } catch (e: any) {
-      console.log(`   ⚠️ 创建结果: ${e.message}`);
+      if (e.message.includes('404')) {
+        console.log(`   ❌ 创建失败 (404): 服务端接口可能未开放`);
+        failed++;
+      } else {
+        console.log(`   ⚠️ 创建结果: ${e.message}`);
+      }
     }
 
     // 3.2 空source校验
@@ -205,7 +214,12 @@ async function runTests() {
       assert(evalResult.evaluation.costAwareness !== undefined, '4.1 包含costAwareness维度');
       console.log(`   评估结果: Safety=${evalResult.evaluation.safety.level}`);
     } catch (e: any) {
-      console.log(`   ⚠️ 评估结果: ${e.message}`);
+      if (e.message.includes('404')) {
+        console.log(`   ❌ 评估失败 (404): 服务端接口可能未开放`);
+        failed++;
+      } else {
+        console.log(`   ⚠️ 评估结果: ${e.message}`);
+      }
     }
   }
 
@@ -231,7 +245,12 @@ async function runTests() {
       assert(Array.isArray(relationships), '5.1 分析返回数组');
       console.log(`   发现 ${relationships.length} 个关系`);
     } catch (e: any) {
-      console.log(`   ⚠️ 分析结果: ${e.message}`);
+      if (e.message.includes('404')) {
+        console.log(`   ❌ 分析失败 (404): 服务端接口可能未开放`);
+        failed++;
+      } else {
+        console.log(`   ⚠️ 分析结果: ${e.message}`);
+      }
     }
   }
 
