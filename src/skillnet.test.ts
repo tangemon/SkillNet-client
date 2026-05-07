@@ -27,7 +27,8 @@ jest.mock('fs', () => ({
   readFileSync: jest.fn(),
   writeFileSync: jest.fn(),
   readFile: jest.fn(),
-  mkdirSync: jest.fn()
+  mkdirSync: jest.fn(),
+  statSync: jest.fn()
 }));
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -342,14 +343,11 @@ describe('SkillNetClient', () => {
 
   describe('Evaluate', () => {
     const mockEvaluateResponse = {
-      success: true,
-      evaluation: {
-        safety: { level: 'Good', reason: 'No harmful content detected' },
-        completeness: { level: 'Excellent', reason: 'All required components present' },
-        executability: { level: 'Good', reason: 'Code is executable' },
-        maintainability: { level: 'Fair', reason: 'Could use better documentation' },
-        cost_awareness: { level: 'Good', reason: 'API usage is documented' }
-      }
+      safety: { level: 'Good', reason: 'No harmful content detected' },
+      completeness: { level: 'Excellent', reason: 'All required components present' },
+      executability: { level: 'Good', reason: 'Code is executable' },
+      maintainability: { level: 'Fair', reason: 'Could use better documentation' },
+      costAwareness: { level: 'Good', reason: 'API usage is documented' }
     };
 
     it('should require apiKey for evaluate operation', async () => {
@@ -358,40 +356,33 @@ describe('SkillNetClient', () => {
       })).rejects.toThrow('API key is required for evaluate operation');
     });
 
-    it('should evaluate skill from GitHub URL', async () => {
+    it('should evaluate skill from local path and return result', async () => {
       const clientWithKey = new SkillNetClient({ apiKey: 'sk-test' });
-      mockAxiosInstance.post = jest.fn().mockResolvedValue({ data: mockEvaluateResponse });
-
-      const result = await clientWithKey.evaluate({
-        target: 'https://github.com/anthropics/skills/tree/main/skills/algorithmic-art'
+      
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'statSync').mockReturnValue({ isDirectory: () => true } as any);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('skill-test', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.toString().includes('SKILL.md')) {
+          return `---\nname: test\ndescription: Test\n---\n# Test`;
+        }
+        return '';
       });
 
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-        '/evaluate',
-        expect.objectContaining({
-          target: 'https://github.com/anthropics/skills/tree/main/skills/algorithmic-art'
-        })
-      );
+      mockAxiosInstance.post = jest.fn().mockResolvedValue({
+        data: { choices: [{ message: { content: JSON.stringify(mockEvaluateResponse) } }] }
+      });
+
+      const result = await clientWithKey.evaluate({ target: './my_skills/web_search' });
+
       expect(result.success).toBe(true);
       expect(result.evaluation).toHaveProperty('safety');
       expect(result.evaluation).toHaveProperty('completeness');
       expect(result.evaluation).toHaveProperty('executability');
       expect(result.evaluation).toHaveProperty('maintainability');
       expect(result.evaluation).toHaveProperty('costAwareness');
-    });
-
-    it('should evaluate local skill path', async () => {
-      const clientWithKey = new SkillNetClient({ apiKey: 'sk-test' });
-      mockAxiosInstance.post = jest.fn().mockResolvedValue({ data: mockEvaluateResponse });
-
-      await clientWithKey.evaluate({ target: './my_skills/web_search' });
-
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-        '/evaluate',
-        expect.objectContaining({
-          target: './my_skills/web_search'
-        })
-      );
     });
 
     it('should throw error when target is missing', async () => {
@@ -401,12 +392,15 @@ describe('SkillNetClient', () => {
         .rejects.toThrow('Target is required');
     });
 
-    it('should throw error on evaluate failure', async () => {
+    it('should return error result when path does not exist', async () => {
       const clientWithKey = new SkillNetClient({ apiKey: 'sk-test' });
-      mockAxiosInstance.post = jest.fn().mockRejectedValue(new Error('Evaluate failed'));
+      
+      jest.spyOn(fs, 'existsSync').mockReturnValue(false);
 
-      await expect(clientWithKey.evaluate({ target: './skill' }))
-        .rejects.toThrow('Evaluate failed');
+      const result = await clientWithKey.evaluate({ target: './non_existent_path' });
+
+      expect(result.success).toBe(false);
+      expect(result.evaluation).toHaveProperty('error');
     });
   });
 

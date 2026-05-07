@@ -4,6 +4,7 @@ import * as path from 'path';
 
 import { Creator, CreateResult, DEFAULT_MODEL } from './creator';
 import { SkillRelationshipAnalyzer as Analyzer, AnalyzerConfig } from './analyzer';
+import { SkillEvaluator as Evaluator, EvaluatorConfig } from './evaluate';
 
 export enum SearchMode {
   Keyword = 'keyword',
@@ -73,6 +74,7 @@ export interface EvaluationResult {
   executability: EvaluationDimension;
   maintainability: EvaluationDimension;
   costAwareness: EvaluationDimension;
+  error?: string;
 }
 
 export interface EvaluateOptions {
@@ -315,31 +317,40 @@ export class SkillNetClient {
       throw new Error('Target is required');
     }
 
-    const body: Record<string, any> = {
-      target: options.target,
-      base_url: this.llmBaseUrl
+    const evaluatorConfig: EvaluatorConfig = {
+      apiKey: this.apiKey,
+      baseUrl: this.llmBaseUrl,
+      model: options.model,
+      githubToken: this.githubToken
     };
 
-    if (options.category) {
-      body.category = options.category;
-    }
-    if (options.model) {
-      body.model = options.model;
-    }
+    const evaluator = new Evaluator(evaluatorConfig);
 
     try {
-      const response = await this.client.post('/evaluate', body);
-      const data = response.data;
+      const isUrl = options.target.startsWith('http://') || options.target.startsWith('https://');
+      
+      let evaluation: EvaluationResult;
+      
+      if (isUrl) {
+        evaluation = await evaluator.evaluateFromUrl(options.target, {
+          category: options.category
+        });
+      } else {
+        evaluation = await evaluator.evaluateFromPath(options.target, {
+          category: options.category
+        });
+      }
+
+      if (evaluation.error) {
+        return {
+          success: false,
+          evaluation: evaluation
+        };
+      }
 
       return {
-        success: data.success,
-        evaluation: {
-          safety: data.evaluation.safety,
-          completeness: data.evaluation.completeness,
-          executability: data.evaluation.executability,
-          maintainability: data.evaluation.maintainability,
-          costAwareness: data.evaluation.cost_awareness
-        }
+        success: true,
+        evaluation: evaluation
       };
     } catch (error: any) {
       if (error.response?.data?.error) {
