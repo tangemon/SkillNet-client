@@ -576,6 +576,137 @@ describe('SkillEvaluator', () => {
   });
 });
 
+  describe('loadSkillMetadata edge cases', () => {
+    it('should handle SKILL.md with complex YAML frontmatter', () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('complex-skill', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.toString().includes('complex-skill')) {
+          return `---
+name: complex-skill
+description: A complex skill description
+category: Development
+---
+# Complex Skill`;
+        }
+        return '';
+      });
+
+      const config: EvaluatorConfig = {
+        apiKey: 'sk-test-key',
+        baseUrl: 'https://api.openai.com/v1'
+      };
+      const evaluator = new SkillEvaluator(config);
+      const metadata = evaluator.loadSkillMetadata('./test_skills/complex-skill');
+
+      expect(metadata.name).toBe('complex-skill');
+      expect(metadata.description).toBe('A complex skill description');
+    });
+
+    it('should handle SKILL.md with single quotes in description', () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([
+        createMockDirent('quoted-skill', true)
+      ] as any);
+      jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
+        if (path.toString().includes('quoted-skill')) {
+          return `---
+name: quoted-skill
+description: 'This has single quotes'
+---
+# Quoted Skill`;
+        }
+        return '';
+      });
+
+      const config: EvaluatorConfig = {
+        apiKey: 'sk-test-key',
+        baseUrl: 'https://api.openai.com/v1'
+      };
+      const evaluator = new SkillEvaluator(config);
+      const metadata = evaluator.loadSkillMetadata('./test_skills/quoted-skill');
+
+      expect(metadata.name).toBe('quoted-skill');
+      expect(metadata.description).toBe('This has single quotes');
+    });
+  });
+
+  describe('_buildEvaluationPrompt edge cases', () => {
+    it('should handle empty scripts array', () => {
+      const config: EvaluatorConfig = {
+        apiKey: 'sk-test-key',
+        baseUrl: 'https://api.openai.com/v1'
+      };
+      const evaluator = new SkillEvaluator(config);
+
+      const prompt = evaluator._buildEvaluationPrompt(
+        'test-skill',
+        'Test description',
+        '# Test',
+        []
+      );
+
+      expect(prompt).toContain('test-skill');
+      expect(prompt).toContain('[No scripts found]');
+    });
+
+    it('should handle empty references array', () => {
+      const config: EvaluatorConfig = {
+        apiKey: 'sk-test-key',
+        baseUrl: 'https://api.openai.com/v1'
+      };
+      const evaluator = new SkillEvaluator(config);
+
+      const prompt = evaluator._buildEvaluationPrompt(
+        'test-skill',
+        'Test description',
+        '# Test',
+        [{ path: 'scripts/test.py', content: 'print("test")' }],
+        []
+      );
+
+      expect(prompt).toContain('[No references found]');
+    });
+
+    it('should handle missing SKILL.md content', () => {
+      const config: EvaluatorConfig = {
+        apiKey: 'sk-test-key',
+        baseUrl: 'https://api.openai.com/v1'
+      };
+      const evaluator = new SkillEvaluator(config);
+
+      const prompt = evaluator._buildEvaluationPrompt(
+        'test-skill',
+        'Test description',
+        '',
+        []
+      );
+
+      expect(prompt).toContain('[SKILL.md not found]');
+    });
+
+    it('should include category when provided', () => {
+      const config: EvaluatorConfig = {
+        apiKey: 'sk-test-key',
+        baseUrl: 'https://api.openai.com/v1'
+      };
+      const evaluator = new SkillEvaluator(config);
+
+      const prompt = evaluator._buildEvaluationPrompt(
+        'test-skill',
+        'Test description',
+        '# Test',
+        [],
+        [],
+        'Development'
+      );
+
+      expect(prompt).toContain('Development');
+    });
+  });
+
 describe('Type Definitions', () => {
   it('should have correct EvaluatorConfig structure', () => {
     const config: EvaluatorConfig = {
