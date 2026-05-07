@@ -12,8 +12,8 @@ import { SkillNetClient, SearchMode, SortBy } from './src';
 
 // ==================== 配置区域 ====================
 const API_KEY = process.env.API_KEY || '';  // 🔑 需要设置: export API_KEY=sk-xxx
-const SKILLNET_URL = 'http://api-skillnet.openkg.cn/v1';
-const LLM_BASE_URL = 'https://api.openai.com/v1';  // 🔑 可选: 自定义LLM端点
+const SKILLNET_URL = process.env.SKILLNET_URL || 'http://api-skillnet.openkg.cn/v1';
+const LLM_BASE_URL = process.env.BASE_URL || 'https://api.openai.com/v1';  // 🔑 可选: 自定义LLM端点
 // =================================================
 
 const client = new SkillNetClient({
