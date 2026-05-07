@@ -82,23 +82,29 @@ export interface Relationship {
 
 export interface ClientConfig {
   apiKey?: string;
+  /** SkillNet API 服务端地址，默认: http://api-skillnet.openkg.cn/v1 */
+  skillnetUrl?: string;
+  /** LLM API 端点（用于 create/evaluate/analyze），默认: https://api.openai.com/v1 */
   baseUrl?: string;
   githubToken?: string;
 }
 
-const DEFAULT_BASE_URL = 'http://api-skillnet.openkg.cn/v1';
+const DEFAULT_SKILLNET_URL = 'http://api-skillnet.openkg.cn/v1';
+const DEFAULT_LLM_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_DOWNLOAD_DIR = './skillnet_downloads';
 
 export class SkillNetClient {
   private client: AxiosInstance;
   private apiKey?: string;
   private githubToken?: string;
+  private llmBaseUrl: string;
 
   constructor(config: ClientConfig = {}) {
-    const baseURL = config.baseUrl || DEFAULT_BASE_URL;
+    const skillnetUrl = config.skillnetUrl || DEFAULT_SKILLNET_URL;
+    this.llmBaseUrl = config.baseUrl || DEFAULT_LLM_BASE_URL;
     
     this.client = axios.create({
-      baseURL,
+      baseURL: skillnetUrl,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json'
@@ -232,7 +238,8 @@ export class SkillNetClient {
     }
 
     const body: Record<string, any> = {
-      output_dir: options.outputDir
+      output_dir: options.outputDir,
+      base_url: this.llmBaseUrl
     };
 
     if (options.trajectoryContent) {
@@ -280,7 +287,8 @@ export class SkillNetClient {
     }
 
     const body: Record<string, any> = {
-      target: options.target
+      target: options.target,
+      base_url: this.llmBaseUrl
     };
 
     if (options.category) {
@@ -322,7 +330,8 @@ export class SkillNetClient {
     }
 
     const body: Record<string, any> = {
-      skills_dir: options.skillsDir
+      skills_dir: options.skillsDir,
+      base_url: this.llmBaseUrl
     };
 
     if (options.noSave) {

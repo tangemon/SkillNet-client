@@ -12,12 +12,14 @@ import { SkillNetClient, SearchMode, SortBy } from './src';
 
 // ==================== 配置区域 ====================
 const API_KEY = process.env.API_KEY || '';  // 🔑 需要设置: export API_KEY=sk-xxx
-const BASE_URL = 'http://api-skillnet.openkg.cn/v1';
+const SKILLNET_URL = 'http://api-skillnet.openkg.cn/v1';
+const LLM_BASE_URL = 'https://api.openai.com/v1';  // 🔑 可选: 自定义LLM端点
 // =================================================
 
 const client = new SkillNetClient({
   apiKey: API_KEY || undefined,
-  baseUrl: BASE_URL
+  skillnetUrl: SKILLNET_URL,
+  baseUrl: LLM_BASE_URL
 });
 
 let passed = 0;

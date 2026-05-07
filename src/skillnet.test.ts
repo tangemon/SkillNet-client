@@ -42,9 +42,16 @@ describe('SkillNetClient', () => {
       expect(clientWithKey).toBeInstanceOf(SkillNetClient);
     });
 
-    it('should create client with custom baseUrl', () => {
+    it('should create client with custom LLM baseUrl', () => {
       const clientWithUrl = new SkillNetClient({ 
-        baseUrl: 'https://custom.api.com/v1' 
+        baseUrl: 'https://custom.llm.api.com/v1' 
+      });
+      expect(clientWithUrl).toBeInstanceOf(SkillNetClient);
+    });
+
+    it('should create client with custom SkillNet URL', () => {
+      const clientWithUrl = new SkillNetClient({ 
+        skillnetUrl: 'https://custom.skillnet.api.com/v1' 
       });
       expect(clientWithUrl).toBeInstanceOf(SkillNetClient);
     });
